@@ -1,6 +1,6 @@
 # UpdatePics 照片修改
 ---
-##The main function of Project:
+The main function of Project:
   * 1. Print all information of pictures
   * 2. Update the last-modified time of pictures to the original time
   * 3. Update the last-modified time of videos to the original time
