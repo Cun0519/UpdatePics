@@ -10,41 +10,82 @@ import java.io.File;
 import java.nio.file.Files;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Scanner;
 
 public class MainProcess {
 
     /**
      * path为照片路径
-     * movePath为移动文件夹路径
      * videoPath为视频路径
+     * PicWithoutTime为照片移动路径
+     * videoWithoutTimePath为视频移动路径
      */
     private static String path = "C:\\Users\\CunXie\\Pictures\\iCloud";
-    private static String movePath = "C:\\Users\\CunXie\\Pictures\\move\\";
     private static String videoPath = "C:\\Users\\CunXie\\Pictures\\MOV";
+    private static String picWithoutTimePath = "C:\\Users\\CunXie\\Pictures\\PicWithoutTime\\";
+    private static String videoWithoutTimePath = "C:\\Users\\CunXie\\Pictures\\VideoWithoutTime\\";
 
     /**
      * 在main()函数中根据需求去调用不同方法
      * @param args
      */
     public static void main(String[] args) {
-        File directory = new File(videoPath);
-        int count = 0;
-        int moveCount = 0;
-        for (File pic : directory.listFiles()) {
-            int flag = updateVideoTime(pic);
-            switch (flag) {
+
+        Scanner sc = new Scanner(System.in);
+        int countAll = 0;
+        int countSuccess = 0;
+
+        System.out.println("1. updatePicTime");
+        System.out.println("2. updateVideoTime");
+        System.out.println("3. readPicAll");
+        System.out.println("Please choose a function:");
+        if (sc.hasNext()) {
+            int input = sc.nextInt();
+            File directory;
+            switch (input) {
                 case 1:
-                    count++;
-                case 0:
-                    moveCount++;
+                    directory = new File(path);
+                    for (File pic : directory.listFiles()) {
+                        countAll++;
+                        int flag = updatePicTime(pic);
+                        if (flag == 1) {
+                            countSuccess++;
+                        }
+                    }
+                    break;
+                case 2:
+                    directory = new File(videoPath);
+                    for (File pic : directory.listFiles()) {
+                        countAll++;
+                        int flag = updateVideoTime(pic);
+                        if (flag == 1) {
+                            countSuccess++;
+                        }
+                    }
+                    break;
+                case 3:
+                    directory = new File(path);
+                    for (File pic : directory.listFiles()) {
+                        countAll++;
+                        int flag = readPicAll(pic);
+                        if (flag == 1) {
+                            countSuccess++;
+                        }
+                    }
+                    break;
+                default:
+                    System.out.println("Illegal input!");
+                    return;
             }
         }
-        System.out.println(count);
-        //System.out.println(moveCount);
+
+        System.out.println("总文件数：" + countAll);
+        System.out.println("成功处理：" + countSuccess);
     }
 
     /**
      * 将照片的修改时间更新为照片的拍摄时间
+     * 将没有拍摄时间的照片移动至另一文件夹
      * @param pic
      * @return 照片如果包含拍摄时间则返回1，否则返回0
      */
@@ -55,14 +96,23 @@ public class MainProcess {
             for (Directory directory : metadata.getDirectories()) {
                 for (Tag tag : directory.getTags()) {
                     if (tag.getTagType() == 0x9003) {
-                        flag = 1;
-
                         SimpleDateFormat simpleDateFormat = new SimpleDateFormat("yyyy:MM:dd HH:mm:ss");
                         Date originalDate = simpleDateFormat.parse(tag.getDescription());
                         long time = originalDate.getTime();
                         pic.setLastModified(time);
+
+                        flag = 1;
                     }
                 }
+            }
+
+            if (flag == 0) {
+                File moveDirectory = new File(picWithoutTimePath);
+                if (!moveDirectory.exists()) {
+                    moveDirectory.mkdirs();
+                }
+                File moveFile = new File(picWithoutTimePath + pic.getName());
+                Files.move(pic.toPath(), moveFile.toPath());
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -72,6 +122,7 @@ public class MainProcess {
 
     /**
      * 将视频的修改时间更新为视频的拍摄时间
+     * 将没有拍摄时间的视频移动至另一文件夹
      * @param video
      * @return 视频如果包含拍摄时间则返回1，否则返回0
      */
@@ -82,8 +133,6 @@ public class MainProcess {
             for (Directory directory : metadata.getDirectories()) {
                 for (Tag tag : directory.getTags()) {
                     if (tag.getTagType() == 256) {
-                        flag = 1;
-
                         //日期转换
                         String stringTemp = tag.getDescription();
                         String[] stringArrayTemp = stringTemp.split(" ");
@@ -100,37 +149,40 @@ public class MainProcess {
                         Date originalDate = simpleDateFormat.parse(stringBufferTemp.toString());
                         long time = originalDate.getTime();
                         video.setLastModified(time);
+
+                        flag = 1;
                     }
                 }
             }
         } catch (Exception e) {
+            try {
+                if (flag == 0) {
+                    File moveDirectory = new File(videoWithoutTimePath);
+                    if (!moveDirectory.exists()) {
+                        moveDirectory.mkdirs();
+                    }
+                    File moveFile = new File(videoWithoutTimePath + video.getName());
+                    Files.move(video.toPath(), moveFile.toPath());
+                }
+            } catch (Exception e1) {
+                e1.printStackTrace();
+            }
             e.printStackTrace();
         }
         return flag;
     }
 
     /**
-     * 将没有拍摄时间的照片移动至另一文件夹
-     * @param pic
-     */
-    private static void movePicWithoutTime(File pic) {
-        try {
-            File moveFile = new File(movePath + pic.getName());
-            Files.move(pic.toPath(), moveFile.toPath());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
      * 显示照片的所有信息
      * @param pic
      */
-    private static void readPicAll(File pic) {
+    private static int readPicAll(File pic) {
+        int flag = 0;
         try {
             Metadata metadata = ImageMetadataReader.readMetadata(pic);
             for (Directory directory : metadata.getDirectories()) {
                 for (Tag tag : directory.getTags()) {
+                    flag = 1;
                     System.out.format("[%s] - %s = %s",
                             directory.getName(), tag.getTagName(), tag.getDescription());
                     System.out.println("");
@@ -144,5 +196,6 @@ public class MainProcess {
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return flag;
     }
 }
